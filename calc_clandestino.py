@@ -3,6 +3,8 @@ import pandas as pd
 import openpyxl
 import os
 import uuid
+import sys
+import subprocess
 from datetime import datetime, date
 from io import BytesIO
 
@@ -13,7 +15,7 @@ try:
 except ImportError:
     DOCX_DISPONIVEL = False
 
-# Importação para conversão em Windows com tratamento de Processos COM
+# Importação para conversão em Windows via COM API
 try:
     import win32com.client as win32
     import pythoncom
@@ -22,7 +24,7 @@ except ImportError:
     EXCEL_DISPONIVEL = False
 
 st.set_page_config(
-    page_title="Calculadora CNR",
+    page_title="Calculadora CNR - Inciso V",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -45,6 +47,68 @@ def carregar_arquivo(uploaded_file):
             except (UnicodeDecodeError, Exception):
                 continue
         raise Exception("Não foi possível carregar o arquivo CSV.")
+
+def converter_para_pdf_universal(caminho_entrada, caminho_saida):
+    """
+    Função Híbrida:
+    - Se for Windows com Office: mantém a execução original via win32com.
+    - Se for Linux / Streamlit Cloud: utiliza LibreOffice em modo headless.
+    """
+    if sys.platform.startswith("win") and EXCEL_DISPONIVEL:
+        # EXECUÇÃO ORIGINAL NO WINDOWS
+        try:
+            pythoncom.CoInitialize()
+            if caminho_entrada.endswith('.xlsx'):
+                excel_app = win32.Dispatch("Excel.Application")
+                try: excel_app.Visible = False
+                except Exception: pass
+                excel_app.DisplayAlerts = False
+                
+                wb_com = excel_app.Workbooks.Open(caminho_entrada)
+                ws_com = wb_com.Worksheets(1)
+                ws_com.PageSetup.Zoom = False
+                ws_com.PageSetup.FitToPagesWide = 1
+                ws_com.PageSetup.FitToPagesTall = 1
+                
+                wb_com.ExportAsFixedFormat(0, caminho_saida)
+                wb_com.Close(False)
+                excel_app.Quit()
+            elif caminho_entrada.endswith('.docx'):
+                word_app = win32.Dispatch("Word.Application")
+                try: word_app.Visible = False
+                except Exception: pass
+                
+                doc_com = word_app.Documents.Open(caminho_entrada)
+                doc_com.SaveAs(caminho_saida, FileFormat=17) # 17 = wdFormatPDF
+                doc_com.Close(False)
+                word_app.Quit()
+            return os.path.exists(caminho_saida)
+        except Exception as e:
+            st.error(f"Erro na conversão via Office (Windows): {e}")
+            return False
+        finally:
+            pythoncom.CoUninitialize()
+    else:
+        # EXECUÇÃO NA NUVEM / LINUX (STREAMLIT CLOUD VIA LIBREOFFICE)
+        try:
+            diretorio_saida = os.path.dirname(caminho_saida)
+            cmd = [
+                "libreoffice",
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", diretorio_saida,
+                caminho_entrada
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            pdf_gerado_temp = os.path.splitext(caminho_entrada)[0] + ".pdf"
+            if os.path.exists(pdf_gerado_temp) and pdf_gerado_temp != caminho_saida:
+                os.rename(pdf_gerado_temp, caminho_saida)
+                
+            return os.path.exists(caminho_saida)
+        except Exception as e:
+            st.error(f"Erro na conversão via LibreOffice (Nuvem): {e}")
+            return False
 
 def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, dt_ini_efetiva, dt_fim_efetiva):
     wb = openpyxl.load_workbook(caminho_modelo)
@@ -134,44 +198,15 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     wb.save(temp_excel)
     
     pdf_bytes = None
-    excel_app = None
-    wb_com = None
-    
-    if EXCEL_DISPONIVEL:
-        try:
-            pythoncom.CoInitialize()
-            excel_app = win32.Dispatch("Excel.Application")
-            try: excel_app.Visible = False
-            except Exception: pass
-            excel_app.DisplayAlerts = False
+    if converter_para_pdf_universal(temp_excel, temp_pdf):
+        with open(temp_pdf, "rb") as f:
+            pdf_bytes = f.read()
             
-            wb_com = excel_app.Workbooks.Open(temp_excel)
-            ws_com = wb_com.Worksheets(1)
-            ws_com.PageSetup.Zoom = False
-            ws_com.PageSetup.FitToPagesWide = 1
-            ws_com.PageSetup.FitToPagesTall = 1
-            
-            wb_com.ExportAsFixedFormat(0, temp_pdf)
-            
-            if os.path.exists(temp_pdf):
-                with open(temp_pdf, "rb") as f:
-                    pdf_bytes = f.read()
-        except Exception as e:
-            st.error(f"Erro na conversão PDF via Excel: {e}")
-        finally:
-            if wb_com:
-                try: wb_com.Close(False)
-                except: pass
-            if excel_app:
-                try: excel_app.Quit()
-                except: pass
-            pythoncom.CoUninitialize()
-    
     for temp_file in [temp_excel, temp_pdf]:
         if os.path.exists(temp_file):
             try: os.remove(temp_file)
             except Exception: pass
-    
+            
     return pdf_bytes
 
 def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
@@ -209,30 +244,9 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
     doc.save(temp_docx)
     
     pdf_bytes = None
-    word_app = None
-    doc_com = None
-    
-    if EXCEL_DISPONIVEL:
-        try:
-            pythoncom.CoInitialize()
-            word_app = win32.Dispatch("Word.Application")
-            try: word_app.Visible = False
-            except Exception: pass
-            
-            doc_com = word_app.Documents.Open(temp_docx)
-            doc_com.SaveAs(temp_pdf, FileFormat=17)
-            doc_com.Close(False)
-            
-            if os.path.exists(temp_pdf):
-                with open(temp_pdf, "rb") as f:
-                    pdf_bytes = f.read()
-        except Exception as e:
-            st.error(f"Erro na conversão da Notificação PDF: {e}")
-        finally:
-            if word_app:
-                try: word_app.Quit()
-                except: pass
-            pythoncom.CoUninitialize()
+    if converter_para_pdf_universal(temp_docx, temp_pdf):
+        with open(temp_pdf, "rb") as f:
+            pdf_bytes = f.read()
             
     for temp_file in [temp_docx, temp_pdf]:
         if os.path.exists(temp_file):
@@ -241,7 +255,7 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
             
     return pdf_bytes
 
-st.title("Calculadora de CNR Clandestino")
+st.title("Calculadora de CNR Clandestino (Art. 595, Inciso V)")
 st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização.")
 
 # BARRA LATERAL (SIDEBAR)
@@ -341,7 +355,7 @@ if file_historico:
 
             data_insp_str = data_inspecao_usada.strftime('%d/%m/%Y') if pd.notnull(data_inspecao_usada) else 'N/A'
 
-            # 📌 BUSCA DINÂMICA DO NOME DO CLIENTE COM BASE NA DATA DA INSPEÇÃO
+            # BUSCA DINÂMICA DO NOME DO CLIENTE COM BASE NA DATA DA INSPEÇÃO
             nome_cliente_padrao = "N/A"
             dados_uc_hist_busca = df_hist[df_hist['UC'] == selected_uc].copy()
             
@@ -349,7 +363,6 @@ if file_historico:
                 dados_uc_hist_busca['DT_INI_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_INICIAL'], errors='coerce')
                 dados_uc_hist_busca['DT_FIM_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_FINAL'], errors='coerce')
                 
-                # Procura o ciclo onde a data da inspeção está contida (entre DATA_INICIAL e DATA_FINAL)
                 ciclo_inspecao = dados_uc_hist_busca[
                     (dados_uc_hist_busca['DT_INI_PARSED'] <= data_inspecao_usada) & 
                     (dados_uc_hist_busca['DT_FIM_PARSED'] >= data_inspecao_usada)
@@ -358,7 +371,6 @@ if file_historico:
                 if len(ciclo_inspecao) > 0 and pd.notnull(ciclo_inspecao['NOMECLIENTE'].values[0]):
                     nome_cliente_padrao = str(ciclo_inspecao['NOMECLIENTE'].values[0]).strip()
                 else:
-                    # Fallback: pega o nome mais recente cadastrado no histórico da UC
                     nomes_validos = dados_uc_hist_busca['NOMECLIENTE'].dropna().unique()
                     if len(nomes_validos) > 0:
                         nome_cliente_padrao = str(nomes_validos[0]).strip()
@@ -515,20 +527,19 @@ if file_historico:
                             use_container_width=True
                         )
                         
-                        if EXCEL_DISPONIVEL:
-                            if st.button("Gerar Detalhamento em PDF (.pdf)", type="primary", use_container_width=True):
-                                with st.spinner("Gerando PDF do Detalhamento..."):
-                                    pdf_detalhamento = gerar_e_converter_pdf_demanda(
-                                        caminho_modelo_excel, dados_uc_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, selected_uc, dt_ini_efetiva, dt_fim_efetiva
+                        if st.button("Gerar Detalhamento em PDF (.pdf)", type="primary", use_container_width=True):
+                            with st.spinner("Gerando PDF do Detalhamento..."):
+                                pdf_detalhamento = gerar_e_converter_pdf_demanda(
+                                    caminho_modelo_excel, dados_uc_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, selected_uc, dt_ini_efetiva, dt_fim_efetiva
+                                )
+                                if pdf_detalhamento:
+                                    st.download_button(
+                                        label="💾 Salvar PDF do Detalhamento",
+                                        data=pdf_detalhamento,
+                                        file_name=f"Detalhamento_do_Faturamento_UC_{selected_uc}_TOI_{toi_str}.pdf",
+                                        mime="application/pdf",
+                                        use_container_width=True
                                     )
-                                    if pdf_detalhamento:
-                                        st.download_button(
-                                            label="💾 Salvar PDF do Detalhamento",
-                                            data=pdf_detalhamento,
-                                            file_name=f"Detalhamento_do_Faturamento_UC_{selected_uc}_TOI_{toi_str}.pdf",
-                                            mime="application/pdf",
-                                            use_container_width=True
-                                        )
                     else:
                         st.error(f"⚠️ O arquivo `{caminho_modelo_excel}` não foi encontrado.")
                 
