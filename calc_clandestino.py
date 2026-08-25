@@ -24,7 +24,7 @@ except ImportError:
     EXCEL_DISPONIVEL = False
 
 st.set_page_config(
-    page_title="Calculadora CNR - Inciso V",
+    page_title="Calculadora CNR",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -255,7 +255,7 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
             
     return pdf_bytes
 
-st.title("Calculadora de CNR Clandestino (Art. 595, Inciso V)")
+st.title("Calculadora de CNR Clandestino")
 st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização.")
 
 # BARRA LATERAL (SIDEBAR)
