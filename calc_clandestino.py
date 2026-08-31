@@ -24,7 +24,7 @@ except ImportError:
     EXCEL_DISPONIVEL = False
 
 st.set_page_config(
-    page_title="Calculadora CNR",
+    page_title="Calculadora CNR - Inciso V",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -55,7 +55,6 @@ def converter_para_pdf_universal(caminho_entrada, caminho_saida):
     - Se for Linux / Streamlit Cloud: utiliza LibreOffice em modo headless.
     """
     if sys.platform.startswith("win") and EXCEL_DISPONIVEL:
-        # EXECUÇÃO ORIGINAL NO WINDOWS
         try:
             pythoncom.CoInitialize()
             if caminho_entrada.endswith('.xlsx'):
@@ -89,7 +88,6 @@ def converter_para_pdf_universal(caminho_entrada, caminho_saida):
         finally:
             pythoncom.CoUninitialize()
     else:
-        # EXECUÇÃO NA NUVEM / LINUX (STREAMLIT CLOUD VIA LIBREOFFICE)
         try:
             diretorio_saida = os.path.dirname(caminho_saida)
             cmd = [
@@ -255,7 +253,7 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
             
     return pdf_bytes
 
-st.title("Calculadora de CNR Clandestino")
+st.title("Calculadora de CNR Clandestino (Art. 595, Inciso V)")
 st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização.")
 
 # BARRA LATERAL (SIDEBAR)
@@ -355,23 +353,21 @@ if file_historico:
 
             data_insp_str = data_inspecao_usada.strftime('%d/%m/%Y') if pd.notnull(data_inspecao_usada) else 'N/A'
 
-            # BUSCA DINÂMICA DO NOME DO CLIENTE COM BASE NA DATA DA INSPEÇÃO
+            # 📌 BUSCA GARANTIDA DO NOME DO TITULAR MAIS RECENTE/ATUAL DA UC
             nome_cliente_padrao = "N/A"
             dados_uc_hist_busca = df_hist[df_hist['UC'] == selected_uc].copy()
             
             if 'NOMECLIENTE' in dados_uc_hist_busca.columns and len(dados_uc_hist_busca) > 0:
-                dados_uc_hist_busca['DT_INI_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_INICIAL'], errors='coerce')
                 dados_uc_hist_busca['DT_FIM_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_FINAL'], errors='coerce')
                 
-                ciclo_inspecao = dados_uc_hist_busca[
-                    (dados_uc_hist_busca['DT_INI_PARSED'] <= data_inspecao_usada) & 
-                    (dados_uc_hist_busca['DT_FIM_PARSED'] >= data_inspecao_usada)
-                ]
-                
-                if len(ciclo_inspecao) > 0 and pd.notnull(ciclo_inspecao['NOMECLIENTE'].values[0]):
-                    nome_cliente_padrao = str(ciclo_inspecao['NOMECLIENTE'].values[0]).strip()
+                # 1º Tenta pegar o nome do 1º ciclo pós-inspeção
+                pos_insp = dados_uc_hist_busca[dados_uc_hist_busca['DT_FIM_PARSED'] > data_inspecao_usada].sort_values('DT_FIM_PARSED')
+                if len(pos_insp) > 0 and pd.notnull(pos_insp['NOMECLIENTE'].values[0]):
+                    nome_cliente_padrao = str(pos_insp['NOMECLIENTE'].values[0]).strip()
                 else:
-                    nomes_validos = dados_uc_hist_busca['NOMECLIENTE'].dropna().unique()
+                    # 2º Se não houver ciclo pós, pega o nome do registro mais recente do histórico
+                    hist_ordenado = dados_uc_hist_busca.sort_values('DT_FIM_PARSED', ascending=False)
+                    nomes_validos = hist_ordenado['NOMECLIENTE'].dropna().unique()
                     if len(nomes_validos) > 0:
                         nome_cliente_padrao = str(nomes_validos[0]).strip()
 
@@ -382,7 +378,7 @@ if file_historico:
             st.markdown("**Campos Cadastrais:**")
             col_cad1, col_cad2, col_cad3 = st.columns(3)
             
-            nome_cliente_input = col_cad1.text_input("Nome do Cliente (Filtro por Data Inspeção):", value=nome_cliente_padrao)
+            nome_cliente_input = col_cad1.text_input("Nome do Cliente Atual:", value=nome_cliente_padrao)
             toi_input = col_cad2.text_input("Número do TOI / Inspeção:", value=str(dados_uc_prod.get('TOI', 'SN')))
             endereco_input = col_cad3.text_input("Endereço do Cliente:", value=str(dados_uc_prod.get('ENDERECO', dados_uc_prod.get('LOGRADOURO', 'N/A'))))
 
@@ -397,7 +393,7 @@ if file_historico:
                 if pd.notnull(dt_fim_efetiva):
                     dias_calculados = (dt_fim_efetiva - dt_ini_efetiva).days
                     if dias_calculados > 180:
-                        st.warning(f"⚠️ **Alerta:** O período calculado ({dias_calculados} dias) ultrapassa o limite de **180 dias**. "
+                        st.warning(f"⚠️ **Alerta:** O período calculated ({dias_calculados} dias) ultrapassa o limite de **180 dias**. "
                                    f"Período limitado a 180 dias. **Início Sugerido:** `{(dt_fim_efetiva - pd.Timedelta(days=180)).strftime('%d/%m/%Y')}`.")
                         dias_cobranca = 180
                         dt_ini_efetiva = dt_fim_efetiva - pd.Timedelta(days=180)
