@@ -271,7 +271,7 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
             
     return pdf_bytes
 
-st.title("Calculadora de CNR Clandestino )
+st.title("Calculadora de CNR Clandestino" )
 st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização. - Idealizado por Naelsen Pinho")
 
 # BARRA LATERAL (SIDEBAR)
