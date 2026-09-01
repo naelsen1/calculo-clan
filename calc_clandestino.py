@@ -29,6 +29,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 📌 DICIONÁRIO DE MESES EM PORTUGUÊS (GARANTE TRADUÇÃO NO STREAMLIT CLOUD / LINUX)
+MESES_PT = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+}
+
+def obter_data_extenso_pt(dt=None):
+    """Retorna a data atual ou informada por extenso em português brasileiro."""
+    if dt is None:
+        dt = datetime.now()
+    nome_mes = MESES_PT.get(dt.month, "")
+    return f"{dt.day} de {nome_mes} de {dt.year}"
+
 def fmt_br(valor, decimais=2):
     if pd.isnull(valor):
         return "0,00"
@@ -118,6 +132,9 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     
+    # DATAS E NOME POR EXTENSO NO CABEÇALHO DO EXCEL (GARANTE PT-BR)
+    ws['A6'] = f"Goiânia, {obter_data_extenso_pt()}"
+    
     ws['B8'] = str(dados_prod.get('CTA_NOME', 'N/A'))
     ws['B9'] = str(dados_prod.get('UC', 'N/A'))
     ws['B10'] = str(dados_prod.get('TOI', 'N/A'))
@@ -165,6 +182,7 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     
+    ws['A6'] = f"Goiânia, {obter_data_extenso_pt()}"
     ws['B8'] = str(dados_prod.get('CTA_NOME', 'N/A'))
     ws['B9'] = str(dados_prod.get('UC', 'N/A'))
     ws['B10'] = str(dados_prod.get('TOI', 'N/A'))
@@ -360,12 +378,10 @@ if file_historico:
             if 'NOMECLIENTE' in dados_uc_hist_busca.columns and len(dados_uc_hist_busca) > 0:
                 dados_uc_hist_busca['DT_FIM_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_FINAL'], errors='coerce')
                 
-                # 1º Tenta pegar o nome do 1º ciclo pós-inspeção
                 pos_insp = dados_uc_hist_busca[dados_uc_hist_busca['DT_FIM_PARSED'] > data_inspecao_usada].sort_values('DT_FIM_PARSED')
                 if len(pos_insp) > 0 and pd.notnull(pos_insp['NOMECLIENTE'].values[0]):
                     nome_cliente_padrao = str(pos_insp['NOMECLIENTE'].values[0]).strip()
                 else:
-                    # 2º Se não houver ciclo pós, pega o nome do registro mais recente do histórico
                     hist_ordenado = dados_uc_hist_busca.sort_values('DT_FIM_PARSED', ascending=False)
                     nomes_validos = hist_ordenado['NOMECLIENTE'].dropna().unique()
                     if len(nomes_validos) > 0:
@@ -543,11 +559,11 @@ if file_historico:
                 with col_doc2:
                     st.markdown("### 📄 Notificação de Irregularidade")
                     if os.path.exists(caminho_modelo_word) and DOCX_DISPONIVEL:
+                        # 📌 DATA DE EMISSÃO FORMATADA EM PORTUGUÊS
                         dt_hoje_str = datetime.now().strftime('%d.%m.%Y')
                         dt_ini_str = dt_ini_efetiva.strftime('%d/%m/%Y') if pd.notnull(dt_ini_efetiva) else ''
                         dt_fim_str = dt_fim_efetiva.strftime('%d/%m/%Y') if pd.notnull(dt_fim_efetiva) else ''
                         
-                        # 📌 SUBTITUIÇÕES ENCAIXADAS PERFEITAMENTE COM O MODELO OFICIAL
                         dic_substituicoes = {
                             "{{ NUMERO_INSPECAO }}": toi_str,
                             "{{ DATA_EMISSAO }}": dt_hoje_str,
@@ -555,7 +571,7 @@ if file_historico:
                             "{{ ENDERECO_CLIENTE }}": endereco_input if (endereco_input and endereco_input.strip() != "N/A") else "Endereço não cadastrado",
                             "{{ UC_INSTALACAO }}": selected_uc,
                             "{{ DATA_INSPECAO }}": data_insp_str,
-                            "{{ PERIODO_IRREGULARIDADE }}": dt_ini_str,  # Encaixa com o "a {{ DATA_INSPECAO }}" do texto original
+                            "{{ PERIODO_IRREGULARIDADE }}": dt_ini_str,
                             "{{ CONSUMO_REGISTRADO }}": "0",
                             "{{ CONSUMO_APURADO }}": fmt_br(consumo_estimado_total, 0),
                             "{{ VALOR_TOTAL }}": fmt_br(valor_total_debito, 2),
