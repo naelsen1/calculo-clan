@@ -24,7 +24,7 @@ except ImportError:
     EXCEL_DISPONIVEL = False
 
 st.set_page_config(
-    page_title="Calculadora CNR - Inciso V",
+    page_title="Calculadora CNR",
     layout="wide",
     initial_sidebar_state="expanded"
 )
