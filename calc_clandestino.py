@@ -353,7 +353,7 @@ if file_historico:
 
             data_insp_str = data_inspecao_usada.strftime('%d/%m/%Y') if pd.notnull(data_inspecao_usada) else 'N/A'
 
-            # 📌 BUSCA GARANTIDA DO NOME DO TITULAR MAIS RECENTE/ATUAL DA UC
+            # BUSCA GARANTIDA DO NOME DO TITULAR MAIS RECENTE/ATUAL DA UC
             nome_cliente_padrao = "N/A"
             dados_uc_hist_busca = df_hist[df_hist['UC'] == selected_uc].copy()
             
@@ -393,7 +393,7 @@ if file_historico:
                 if pd.notnull(dt_fim_efetiva):
                     dias_calculados = (dt_fim_efetiva - dt_ini_efetiva).days
                     if dias_calculados > 180:
-                        st.warning(f"⚠️ **Alerta:** O período calculated ({dias_calculados} dias) ultrapassa o limite de **180 dias**. "
+                        st.warning(f"⚠️ **Alerta:** O período calculado ({dias_calculados} dias) ultrapassa o limite de **180 dias**. "
                                    f"Período limitado a 180 dias. **Início Sugerido:** `{(dt_fim_efetiva - pd.Timedelta(days=180)).strftime('%d/%m/%Y')}`.")
                         dias_cobranca = 180
                         dt_ini_efetiva = dt_fim_efetiva - pd.Timedelta(days=180)
@@ -547,6 +547,7 @@ if file_historico:
                         dt_ini_str = dt_ini_efetiva.strftime('%d/%m/%Y') if pd.notnull(dt_ini_efetiva) else ''
                         dt_fim_str = dt_fim_efetiva.strftime('%d/%m/%Y') if pd.notnull(dt_fim_efetiva) else ''
                         
+                        # 📌 SUBTITUIÇÕES ENCAIXADAS PERFEITAMENTE COM O MODELO OFICIAL
                         dic_substituicoes = {
                             "{{ NUMERO_INSPECAO }}": toi_str,
                             "{{ DATA_EMISSAO }}": dt_hoje_str,
@@ -554,14 +555,10 @@ if file_historico:
                             "{{ ENDERECO_CLIENTE }}": endereco_input if (endereco_input and endereco_input.strip() != "N/A") else "Endereço não cadastrado",
                             "{{ UC_INSTALACAO }}": selected_uc,
                             "{{ DATA_INSPECAO }}": data_insp_str,
-                            "{{ PERIODO_IRREGULARIDADE }}": f"{dt_ini_str} a {dt_fim_str}",
-                            "01.09.2024 a 13/03/2026": f"{dt_ini_str} a {dt_fim_str}",
-                            "01.09.2024 a {{ DATA_INSPECAO }}": f"{dt_ini_str} a {dt_fim_str}",
+                            "{{ PERIODO_IRREGULARIDADE }}": dt_ini_str,  # Encaixa com o "a {{ DATA_INSPECAO }}" do texto original
                             "{{ CONSUMO_REGISTRADO }}": "0",
                             "{{ CONSUMO_APURADO }}": fmt_br(consumo_estimado_total, 0),
                             "{{ VALOR_TOTAL }}": fmt_br(valor_total_debito, 2),
-                            "942 kWh": f"{fmt_br(consumo_estimado_total, 0)} kWh",
-                            "800,70": fmt_br(valor_total_debito, 2),
                             "{{ JUSTIFICATIVA_CRITERIO }}": "Não foi possível, no momento da inspeção, levantar a carga total da unidade consumidora, ou, pelo menos, identificar quais equipamentos estavam sendo alimentados pelo desvio de energia."
                         }
                         
