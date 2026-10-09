@@ -38,9 +38,9 @@ hora = agora.hour
 minuto = agora.minute
 
 # Condição: Sexta-feira (4) a partir das 08:30 da manhã
-if dia_semana == 1 and (hora > 17 or (hora == 17 and minuto >= 14)):
+if dia_semana == 4 and (hora > 8 or (hora == 8 and minuto >= 30)):
     st.balloons()  # Dispara os balões na tela (Opção 4)
-    st.warning("🚨 **REGRA DE OURO DA TERÇA ** Terça-Feira, 17:20 da tarde: **Semana Praticamente ENCERRADA!** Quem não fez, só AMANHÃ ☕🎉") # Banner (Opção 1)
+    st.warning("🚨 **REGRA DE OURO DA SEXTA:** Sexta-Feira, 08:30 da manhã: **Quem fez, fez!** Quem não fez, só na SEGUNDA! ☕🎉") # Banner (Opção 1)
 # -----------------------------------------------------------------------------
 
 # DICIONÁRIO DE MESES EM PORTUGUÊS (GARANTE TRADUÇÃO NO STREAMLIT CLOUD / LINUX)
@@ -136,7 +136,7 @@ def converter_para_pdf_universal(caminho_entrada, caminho_saida):
             st.error(f"Erro na conversão via LibreOffice (Nuvem): {e}")
             return False
 
-def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, dt_ini_efetiva, dt_fim_efetiva):
+def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, dt_ini_efetiva, dt_fim_efetiva, tarifa_vigente):
     wb = openpyxl.load_workbook(caminho_modelo)
     ws = wb['DIARIO'] if 'DIARIO' in wb.sheetnames else wb.active
     
@@ -166,6 +166,8 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     
     dt_hoje = datetime.now()
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
+    # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL
+    ws['B25'] = float(tarifa_vigente)
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -180,7 +182,7 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     output.seek(0)
     return output
 
-def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, uc_nome, dt_ini_efetiva, dt_fim_efetiva):
+def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, uc_nome, dt_ini_efetiva, dt_fim_efetiva, tarifa_vigente):
     uid = uuid.uuid4().hex[:8]
     temp_excel = os.path.abspath(f"temp_carta_{uc_nome}_{uid}.xlsx")
     temp_pdf = os.path.abspath(f"temp_carta_{uc_nome}_{uid}.pdf")
@@ -214,6 +216,8 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     
     dt_hoje = datetime.now()
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
+    # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL PARA O PDF
+    ws['B25'] = float(tarifa_vigente)
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -284,7 +288,7 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
     return pdf_bytes
 
 st.title("Calculadora de CNR Clandestino")
-st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização. - Desenvolvido por Naelsen Pinho")
+st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização.")
 
 # BARRA LATERAL (SIDEBAR)
 st.sidebar.header("Upload dos Arquivos")
@@ -352,7 +356,7 @@ if file_historico:
                 dados_uc_prod = {}
                 
             valor_coluna_d = dados_uc_prod.get(list(dados_uc_prod.keys())[3], None) if len(dados_uc_prod) > 3 else None
-            data_inspecao_coluna_d = pd.to_datetime(valor_coluna_d, errors='coerce') if valor_coluna_d else None
+            data_inspecao_coluna_d = pd.to_datetime(valor_coluna_d, dayfirst=True, errors='coerce') if valor_coluna_d else None
             
             # 1. DADOS DO CLIENTE E DO CÁLCULO
             st.subheader("1. Dados do Cliente e do Cálculo")
@@ -376,7 +380,7 @@ if file_historico:
                 dt_fim_efetiva = data_inspecao_usada
             elif pd.notnull(data_inspecao_coluna_d):
                 data_inspecao_usada = data_inspecao_coluna_d
-                dt_fim_efetiva = pd.to_datetime(dados_uc_prod.get('DATA_FINAL_DIA', data_inspecao_coluna_d), errors='coerce')
+                dt_fim_efetiva = pd.to_datetime(dados_uc_prod.get('DATA_FINAL_DIA', data_inspecao_coluna_d), dayfirst=True, errors='coerce')
             else:
                 data_inspecao_usada = pd.Timestamp(datetime.now().date())
                 dt_fim_efetiva = data_inspecao_usada
@@ -388,7 +392,7 @@ if file_historico:
             dados_uc_hist_busca = df_hist[df_hist['UC'] == selected_uc].copy()
             
             if 'NOMECLIENTE' in dados_uc_hist_busca.columns and len(dados_uc_hist_busca) > 0:
-                dados_uc_hist_busca['DT_FIM_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_FINAL'], errors='coerce')
+                dados_uc_hist_busca['DT_FIM_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_FINAL'], format='%d/%m/%Y', errors='coerce')
                 
                 pos_insp = dados_uc_hist_busca[dados_uc_hist_busca['DT_FIM_PARSED'] > data_inspecao_usada].sort_values('DT_FIM_PARSED')
                 if len(pos_insp) > 0 and pd.notnull(pos_insp['NOMECLIENTE'].values[0]):
@@ -414,7 +418,7 @@ if file_historico:
             dados_uc_prod['UC'] = selected_uc
             dados_uc_prod['TOI'] = toi_input
 
-            dt_ini_cob = pd.to_datetime(dados_uc_prod.get('DATA_INICIAL_DIA', None), errors='coerce')
+            dt_ini_cob = pd.to_datetime(dados_uc_prod.get('DATA_INICIAL_DIA', None), dayfirst=True, errors='coerce')
             
             if dt_declarada_input is not None:
                 dt_ini_efetiva = pd.Timestamp(dt_declarada_input)
@@ -435,7 +439,7 @@ if file_historico:
                 st.info(f"ℹ️ **Período Retroativo Automático:** Calculando 180 dias para trás a partir da Data de Normalização/Inspeção ({data_inspecao_usada.strftime('%d/%m/%Y')}).")
             else:
                 dt_ini_efetiva = dt_ini_cob
-                dt_fim_cob = pd.to_datetime(dados_uc_prod.get('DATA_FINAL_DIA', None), errors='coerce')
+                dt_fim_cob = pd.to_datetime(dados_uc_prod.get('DATA_FINAL_DIA', None), dayfirst=True, errors='coerce')
                 if pd.notnull(dados_uc_prod.get('PERIODODIAS')) and int(dados_uc_prod.get('PERIODODIAS')) > 0:
                     dias_cobranca = int(dados_uc_prod.get('PERIODODIAS'))
                 elif pd.notnull(dt_ini_cob) and pd.notnull(dt_fim_cob):
@@ -449,14 +453,15 @@ if file_historico:
             st.subheader("2. Histórico de Pós-Faturamento")
             
             dados_uc_hist = df_hist[df_hist['UC'] == selected_uc].copy()
-            dados_uc_hist['DATA_FINAL'] = pd.to_datetime(dados_uc_hist['DATA_FINAL'], errors='coerce')
+            dados_uc_hist['DATA_FINAL'] = pd.to_datetime(dados_uc_hist['DATA_FINAL'], format='%d/%m/%Y', errors='coerce')
+            dados_uc_hist['ANO_REF'] = pd.to_numeric(dados_uc_hist['ANO_REF'], errors='coerce')
+            dados_uc_hist['MES_REF'] = pd.to_numeric(dados_uc_hist['MES_REF'], errors='coerce')
             
             exibir_todo_historico = st.checkbox("🔍 Exibir histórico completo (incluindo ciclos anteriores à inspeção)", value=False)
             
             if exibir_todo_historico:
                 st.write("**Histórico Completo da UC (Ordenado por Mês 1-12):**")
                 df_exibicao = dados_uc_hist.copy()
-                df_exibicao['MES_REF'] = pd.to_numeric(df_exibicao['MES_REF'], errors='coerce')
                 df_exibicao = df_exibicao.sort_values(by=['ANO_REF', 'MES_REF'])
                 df_exibicao['DATA_INICIAL'] = df_exibicao['DATA_INICIAL'].astype(str)
                 df_exibicao['DATA_FINAL'] = df_exibicao['DATA_FINAL'].dt.strftime('%d/%m/%Y')
@@ -467,7 +472,7 @@ if file_historico:
             pos_faturamento = dados_uc_hist[dados_uc_hist['DATA_FINAL'] > data_inspecao_usada].copy() if pd.notnull(data_inspecao_usada) else pd.DataFrame()
             
             if len(pos_faturamento) > 1:
-                pos_faturamento = pos_faturamento.sort_values('DATA_FINAL')
+                pos_faturamento = pos_faturamento.sort_values(by=['ANO_REF', 'MES_REF'])
                 
                 ciclos_apos_descarto = pos_faturamento.iloc[1:]
                 ciclos_validos = ciclos_apos_descarto.head(3).copy()
@@ -541,7 +546,7 @@ if file_historico:
                     st.markdown("### 📊 Detalhamento do Faturamento")
                     if os.path.exists(caminho_modelo_excel):
                         excel_preenchido = preencher_modelo_excel(
-                            caminho_modelo_excel, dados_uc_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, dt_ini_efetiva, dt_fim_efetiva
+                            caminho_modelo_excel, dados_uc_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, dt_ini_efetiva, dt_fim_efetiva, tarifa_vigente_input
                         )
                         st.download_button(
                             label="Baixar Detalhamento em Excel (.xlsx)",
@@ -554,7 +559,7 @@ if file_historico:
                         if st.button("Gerar Detalhamento em PDF (.pdf)", type="primary", use_container_width=True):
                             with st.spinner("Gerando PDF do Detalhamento..."):
                                 pdf_detalhamento = gerar_e_converter_pdf_demanda(
-                                    caminho_modelo_excel, dados_uc_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, selected_uc, dt_ini_efetiva, dt_fim_efetiva
+                                    caminho_modelo_excel, dados_uc_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, selected_uc, dt_ini_efetiva, dt_fim_efetiva, tarifa_vigente_input
                                 )
                                 if pdf_detalhamento:
                                     st.download_button(
