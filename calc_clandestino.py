@@ -29,7 +29,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 📌 DICIONÁRIO DE MESES EM PORTUGUÊS (GARANTE TRADUÇÃO NO STREAMLIT CLOUD / LINUX)
+# -----------------------------------------------------------------------------
+# 🎈 EASTER EGG DA SEXTA-FEIRA (OPÇÃO 1 + OPÇÃO 4)
+# -----------------------------------------------------------------------------
+agora = datetime.now()
+dia_semana = agora.weekday()  # 0 = Segunda, 4 = Sexta-feira
+hora = agora.hour
+minuto = agora.minute
+
+# Condição: Sexta-feira (4) a partir das 08:30 da manhã
+if dia_semana == 1 and (hora > 17 or (hora == 17 and minuto >= 14)):
+    st.balloons()  # Dispara os balões na tela (Opção 4)
+    st.warning("🚨 **REGRA DE OURO DA TERÇA ** Terça-Feira, 17:20 da tarde: **Semana Praticamente ENCERRADA!** Quem não fez, só AMANHÃ ☕🎉") # Banner (Opção 1)
+# -----------------------------------------------------------------------------
+
+# DICIONÁRIO DE MESES EM PORTUGUÊS (GARANTE TRADUÇÃO NO STREAMLIT CLOUD / LINUX)
 MESES_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
     5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
@@ -132,9 +146,7 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     
-    # DATAS E NOME POR EXTENSO NO CABEÇALHO DO EXCEL (GARANTE PT-BR)
     ws['A6'] = f"Goiânia, {obter_data_extenso_pt()}"
-    
     ws['B8'] = str(dados_prod.get('CTA_NOME', 'N/A'))
     ws['B9'] = str(dados_prod.get('UC', 'N/A'))
     ws['B10'] = str(dados_prod.get('TOI', 'N/A'))
@@ -271,8 +283,8 @@ def gerar_notificacao_pdf(caminho_docx, dic_substituicoes, uc_nome):
             
     return pdf_bytes
 
-st.title("Calculadora de CNR Clandestino" )
-st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização. - Idealizado por Naelsen Pinho")
+st.title("Calculadora de CNR Clandestino")
+st.write("Análise individual por UC e TOI com base no maior consumo pós-regularização. - Desenvolvido por Naelsen Pinho")
 
 # BARRA LATERAL (SIDEBAR)
 st.sidebar.header("Upload dos Arquivos")
@@ -559,7 +571,6 @@ if file_historico:
                 with col_doc2:
                     st.markdown("### 📄 Notificação de Irregularidade")
                     if os.path.exists(caminho_modelo_word) and DOCX_DISPONIVEL:
-                        # 📌 DATA DE EMISSÃO FORMATADA EM PORTUGUÊS
                         dt_hoje_str = datetime.now().strftime('%d.%m.%Y')
                         dt_ini_str = dt_ini_efetiva.strftime('%d/%m/%Y') if pd.notnull(dt_ini_efetiva) else ''
                         dt_fim_str = dt_fim_efetiva.strftime('%d/%m/%Y') if pd.notnull(dt_fim_efetiva) else ''
