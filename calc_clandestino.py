@@ -115,21 +115,41 @@ def set_cell_value_seguro(ws, coordenada, valor):
 
 def aplicar_layout_a4(ws):
     """Ajusta a planilha para o layout A4 e margens mais adequadas ao PDF gerado."""
-    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 0
-    ws.page_setup.fitToPage = True
-    ws.page_margins.left = 0.25
-    ws.page_margins.right = 0.25
-    ws.page_margins.top = 0.4
-    ws.page_margins.bottom = 0.4
-    ws.page_margins.header = 0.1
-    ws.page_margins.footer = 0.1
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.sheet_view.zoomScale = 100
-    ws.print_options.horizontalCentered = False
-    ws.print_options.verticalCentered = False
+    try:
+        ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+        ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+    except Exception:
+        pass
+
+    try:
+        ws.page_margins.left = 0.25
+        ws.page_margins.right = 0.25
+        ws.page_margins.top = 0.4
+        ws.page_margins.bottom = 0.4
+        ws.page_margins.header = 0.1
+        ws.page_margins.footer = 0.1
+    except Exception:
+        pass
+
+    try:
+        if ws.sheet_properties.pageSetUpPr is None:
+            ws.sheet_properties.pageSetUpPr = openpyxl.worksheet.page.PageSetupProperties()
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+    except Exception:
+        pass
+
+    try:
+        ws.sheet_view.zoomScale = 100
+    except Exception:
+        pass
+
+    try:
+        ws.print_options.horizontalCentered = False
+        ws.print_options.verticalCentered = False
+    except Exception:
+        pass
 
 
 def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
