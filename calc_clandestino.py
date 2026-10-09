@@ -63,6 +63,34 @@ def fmt_br(valor, decimais=2):
     formato = f"{{:,.{decimais}f}}"
     return formato.format(valor).replace(",", "X").replace(".", ",").replace("X", ".")
 
+
+def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
+    """Retorna o cliente dominante na janela de 3 ciclos após a inspeção, ignorando o primeiro ciclo que segue a inspeção."""
+    if dados_hist_uc is None or dados_hist_uc.empty or pd.isnull(data_inspecao_usada):
+        return "N/A", pd.DataFrame(), None
+
+    pos_faturamento = dados_hist_uc[dados_hist_uc['DATA_FINAL'] > data_inspecao_usada].copy()
+    if len(pos_faturamento) <= 1:
+        return "N/A", pd.DataFrame(), None
+
+    pos_faturamento = pos_faturamento.sort_values(by=['ANO_REF', 'MES_REF'])
+    ciclos_apos_descarto = pos_faturamento.iloc[1:]
+    ciclos_validos = ciclos_apos_descarto.head(3).copy()
+
+    if 'NOMECLIENTE' not in ciclos_validos.columns:
+        return "N/A", ciclos_validos, None
+
+    nomes = ciclos_validos['NOMECLIENTE'].dropna().astype(str).str.strip()
+    nomes = nomes[nomes != ""]
+
+    if nomes.empty:
+        return "N/A", ciclos_validos, None
+
+    contagem = nomes.value_counts()
+    cliente = contagem.index[0]
+    return cliente, ciclos_validos, contagem.to_dict()
+
+
 def carregar_arquivo(uploaded_file):
     if uploaded_file.name.endswith(('xlsx', 'xls')):
         return pd.read_excel(uploaded_file)
@@ -390,18 +418,29 @@ if file_historico:
             # BUSCA GARANTIDA DO NOME DO TITULAR MAIS RECENTE/ATUAL DA UC
             nome_cliente_padrao = "N/A"
             dados_uc_hist_busca = df_hist[df_hist['UC'] == selected_uc].copy()
-            
+
             if 'NOMECLIENTE' in dados_uc_hist_busca.columns and len(dados_uc_hist_busca) > 0:
                 dados_uc_hist_busca['DT_FIM_PARSED'] = pd.to_datetime(dados_uc_hist_busca['DATA_FINAL'], format='%d/%m/%Y', errors='coerce')
-                
-                pos_insp = dados_uc_hist_busca[dados_uc_hist_busca['DT_FIM_PARSED'] > data_inspecao_usada].sort_values('DT_FIM_PARSED')
-                if len(pos_insp) > 0 and pd.notnull(pos_insp['NOMECLIENTE'].values[0]):
-                    nome_cliente_padrao = str(pos_insp['NOMECLIENTE'].values[0]).strip()
+
+                cliente_janela, ciclos_validos, contagem_clientes = obter_cliente_da_janela(dados_uc_hist_busca, data_inspecao_usada)
+                if cliente_janela != "N/A":
+                    nome_cliente_padrao = str(cliente_janela).strip()
+                    if contagem_clientes is not None and len(contagem_clientes) > 1:
+                        nomes_alterados = list(contagem_clientes.keys())
+                        st.warning(
+                            "⚠️ **Atenção:** Na janela de 3 ciclos após a inspeção, o cliente mudou entre "
+                            f"{', '.join(nomes_alterados)}. Isso indica possível troca de titularidade. "
+                            "O cálculo pode seguir, mas o nome do titular deve ser revisado."
+                        )
                 else:
-                    hist_ordenado = dados_uc_hist_busca.sort_values('DT_FIM_PARSED', ascending=False)
-                    nomes_validos = hist_ordenado['NOMECLIENTE'].dropna().unique()
-                    if len(nomes_validos) > 0:
-                        nome_cliente_padrao = str(nomes_validos[0]).strip()
+                    pos_insp = dados_uc_hist_busca[dados_uc_hist_busca['DT_FIM_PARSED'] > data_inspecao_usada].sort_values('DT_FIM_PARSED')
+                    if len(pos_insp) > 0 and pd.notnull(pos_insp['NOMECLIENTE'].values[0]):
+                        nome_cliente_padrao = str(pos_insp['NOMECLIENTE'].values[0]).strip()
+                    else:
+                        hist_ordenado = dados_uc_hist_busca.sort_values('DT_FIM_PARSED', ascending=False)
+                        nomes_validos = hist_ordenado['NOMECLIENTE'].dropna().unique()
+                        if len(nomes_validos) > 0:
+                            nome_cliente_padrao = str(nomes_validos[0]).strip()
 
             if nome_cliente_padrao == "N/A" and 'CTA_NOME' in dados_uc_prod and pd.notnull(dados_uc_prod['CTA_NOME']):
                 nome_cliente_padrao = str(dados_uc_prod['CTA_NOME'])
@@ -470,13 +509,26 @@ if file_historico:
                 st.dataframe(df_exibicao[cols_exib], use_container_width=True)
             
             pos_faturamento = dados_uc_hist[dados_uc_hist['DATA_FINAL'] > data_inspecao_usada].copy() if pd.notnull(data_inspecao_usada) else pd.DataFrame()
-            
+
             if len(pos_faturamento) > 1:
                 pos_faturamento = pos_faturamento.sort_values(by=['ANO_REF', 'MES_REF'])
-                
+
                 ciclos_apos_descarto = pos_faturamento.iloc[1:]
                 ciclos_validos = ciclos_apos_descarto.head(3).copy()
-                
+
+                nomes_ciclos = ciclos_validos['NOMECLIENTE'].dropna().astype(str).str.strip()
+                nomes_ciclos = nomes_ciclos[nomes_ciclos != ""]
+
+                if not nomes_ciclos.empty:
+                    nomes_unicos = nomes_ciclos.unique()
+                    if len(nomes_unicos) > 1:
+                        st.warning(
+                            "⚠️ **Troca de titularidade detectada:** os 3 ciclos analisados após a inspeção têm clientes diferentes "
+                            f"({', '.join(nomes_unicos)}). Isso indica alteração de titularidade e deve ser revisado antes da consolidação."
+                        )
+                    else:
+                        st.success(f"✅ **Titularidade consistente:** todos os 3 ciclos analisados após a inspeção pertencem ao mesmo cliente ({nomes_unicos[0]}).")
+
                 pos_lidas = ciclos_validos[ciclos_validos['CRITERIOFATURAMENTO'].str.upper() == 'LIDA'] if 'CRITERIOFATURAMENTO' in ciclos_validos.columns else pd.DataFrame()
                 
                 usou_minima = False
