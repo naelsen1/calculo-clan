@@ -39,11 +39,11 @@ minuto = agora.minute
 
 # Condição: Sexta-feira (4) a partir das 08:30 da manhã
 if dia_semana == 4 and (hora > 8 or (hora == 8 and minuto >= 30)):
-    st.balloons()  # Dispara os balões na tela (Opção 4)
-    st.warning("🚨 **REGRA DE OURO DA SEXTA:** Sexta-Feira, 08:30 da manhã: **Quem fez, fez!** Quem não fez, só na SEGUNDA! ☕🎉") # Banner (Opção 1)
+    st.balloons()  # Dispara os balões na tela
+    st.warning("🚨 **REGRA DE OURO DA SEXTA:** Sexta-Feira, 08:30 da manhã: **Quem fez, fez!** Quem não fez, só na SEGUNDA! ☕🎉")
 # -----------------------------------------------------------------------------
 
-# DICIONÁRIO DE MESES EM PORTUGUÊS (GARANTE TRADUÇÃO NO STREAMLIT CLOUD / LINUX)
+# DICIONÁRIO DE MESES EM PORTUGUÊS
 MESES_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
     5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
@@ -63,9 +63,8 @@ def fmt_br(valor, decimais=2):
     formato = f"{{:,.{decimais}f}}"
     return formato.format(valor).replace(",", "X").replace(".", ",").replace("X", ".")
 
-
 def valor_para_float_seguro(valor, padrao=0.0):
-    """Converte valores de tarifa/consumo para float, mesmo quando vierem em formato de string ou nulo."""
+    """Converte valores de tarifa/consumo para float."""
     if valor is None or (isinstance(valor, float) and pd.isna(valor)):
         return float(padrao)
 
@@ -82,50 +81,29 @@ def valor_para_float_seguro(valor, padrao=0.0):
             return float(texto)
         return float(valor)
     except Exception:
-        try:
-            texto = str(valor).strip()
-            if texto in ('', 'N/A', 'nan', 'NaN', 'None'):
-                return float(padrao)
-            texto = texto.replace('R$', '').replace('$', '').strip()
-            if ',' in texto and '.' in texto:
-                texto = texto.replace('.', '').replace(',', '.')
-            elif ',' in texto:
-                texto = texto.replace(',', '.')
-            return float(texto)
-        except Exception:
-            return float(padrao)
-
-
-def set_cell_value_seguro(ws, coordenada, valor):
-    """Escreve em uma célula do Excel de forma defensiva contra merged/invalid cells."""
-    try:
-        ws[coordenada] = valor
-        return
-    except Exception:
-        try:
-            coluna, linha = openpyxl.utils.coordinate_to_tuple(coordenada)
-            celula = ws.cell(row=linha, column=coluna)
-            celula.value = valor
-        except Exception:
-            if coordenada.upper().startswith('B'):
-                ws.cell(row=25, column=2, value=valor)
-            else:
-                raise
-
+        return float(padrao)
 
 def aplicar_layout_a4(ws):
-    """Ajusta a planilha para o layout A4 e margens mais adequadas ao PDF gerado."""
+    """Ajusta a planilha para caber perfeitamente na página A4 sem cortes."""
     try:
         ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
         ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        
+        if ws.sheet_properties.pageSetUpPr is None:
+            ws.sheet_properties.pageSetUpPr = openpyxl.worksheet.page.PageSetupProperties()
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+
         ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
+        ws.page_setup.fitToHeight = 1
+        
+        # Define a área de impressão exata do modelo
+        ws.print_area = "A1:I41"
     except Exception:
         pass
 
     try:
-        ws.page_margins.left = 0.25
-        ws.page_margins.right = 0.25
+        ws.page_margins.left = 0.3
+        ws.page_margins.right = 0.3
         ws.page_margins.top = 0.4
         ws.page_margins.bottom = 0.4
         ws.page_margins.header = 0.1
@@ -133,27 +111,8 @@ def aplicar_layout_a4(ws):
     except Exception:
         pass
 
-    try:
-        if ws.sheet_properties.pageSetUpPr is None:
-            ws.sheet_properties.pageSetUpPr = openpyxl.worksheet.page.PageSetupProperties()
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-    except Exception:
-        pass
-
-    try:
-        ws.sheet_view.zoomScale = 100
-    except Exception:
-        pass
-
-    try:
-        ws.print_options.horizontalCentered = False
-        ws.print_options.verticalCentered = False
-    except Exception:
-        pass
-
-
 def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
-    """Retorna o cliente dominante na janela de 3 ciclos após a inspeção, ignorando o primeiro ciclo que segue a inspeção."""
+    """Retorna o cliente dominante na janela de 3 ciclos após a inspeção."""
     if dados_hist_uc is None or dados_hist_uc.empty or pd.isnull(data_inspecao_usada):
         return "N/A", pd.DataFrame(), None
 
@@ -187,7 +146,6 @@ def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
     contagem = nomes.value_counts()
     cliente = contagem.index[0]
     return cliente, ciclos_validos, contagem.to_dict()
-
 
 def carregar_arquivo(uploaded_file):
     if uploaded_file.name.endswith(('xlsx', 'xls')):
@@ -287,8 +245,10 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     
     dt_hoje = datetime.now()
     tarifa_valor = valor_para_float_seguro(tarifa_vigente, 0.0)
+    
+    # 📌 PREENCHIMENTO CORRETO DA TARIFA NAS CÉLULAS DO EXCEL
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
-    set_cell_value_seguro(ws, 'B25', round(tarifa_valor, 6))
+    ws['I25'] = float(tarifa_valor)  # Célula I25 alimenta as fórmulas I26 e I27
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -332,8 +292,10 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     
     dt_hoje = datetime.now()
     tarifa_valor = valor_para_float_seguro(tarifa_vigente, 0.0)
+    
+    # 📌 PREENCHIMENTO CORRETO DA TARIFA NAS CÉLULAS DO EXCEL PARA PDF
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
-    set_cell_value_seguro(ws, 'B25', round(tarifa_valor, 6))
+    ws['I25'] = float(tarifa_valor)  # Célula I25 alimenta as fórmulas I26 e I27
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -552,7 +514,7 @@ if file_historico:
                 if pd.notnull(dt_fim_efetiva):
                     dias_calculados = (dt_fim_efetiva - dt_ini_efetiva).days
                     if dias_calculados > 180:
-                        st.warning(f"⚠️ **Alerta:** O período calculado ({dias_calculados} dias) ultrapassa o limite de **180 dias**. "
+                        st.warning(f"⚠️ **Alerta:** O período calculated ({dias_calculados} dias) ultrapassa o limite de **180 dias**. "
                                    f"Período limitado a 180 dias. **Início Sugerido:** `{(dt_fim_efetiva - pd.Timedelta(days=180)).strftime('%d/%m/%Y')}`.")
                         dias_cobranca = 180
                         dt_ini_efetiva = dt_fim_efetiva - pd.Timedelta(days=180)
