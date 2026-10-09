@@ -74,7 +74,11 @@ def valor_para_float_seguro(valor, padrao=0.0):
             texto = valor.strip()
             if texto in ('', 'N/A', 'nan', 'NaN', 'None'):
                 return float(padrao)
-            texto = texto.replace('R$', '').replace('$', '').replace('.', '').replace(',', '.')
+            texto = texto.replace('R$', '').replace('$', '').strip()
+            if ',' in texto and '.' in texto:
+                texto = texto.replace('.', '').replace(',', '.')
+            elif ',' in texto:
+                texto = texto.replace(',', '.')
             return float(texto)
         return float(valor)
     except Exception:
@@ -82,7 +86,11 @@ def valor_para_float_seguro(valor, padrao=0.0):
             texto = str(valor).strip()
             if texto in ('', 'N/A', 'nan', 'NaN', 'None'):
                 return float(padrao)
-            texto = texto.replace('R$', '').replace('$', '').replace('.', '').replace(',', '.')
+            texto = texto.replace('R$', '').replace('$', '').strip()
+            if ',' in texto and '.' in texto:
+                texto = texto.replace('.', '').replace(',', '.')
+            elif ',' in texto:
+                texto = texto.replace(',', '.')
             return float(texto)
         except Exception:
             return float(padrao)
