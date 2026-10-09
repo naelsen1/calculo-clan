@@ -88,6 +88,23 @@ def valor_para_float_seguro(valor, padrao=0.0):
             return float(padrao)
 
 
+def set_cell_value_seguro(ws, coordenada, valor):
+    """Escreve em uma célula do Excel de forma defensiva contra merged/invalid cells."""
+    try:
+        ws[coordenada] = valor
+        return
+    except Exception:
+        try:
+            coluna, linha = openpyxl.utils.coordinate_to_tuple(coordenada)
+            celula = ws.cell(row=linha, column=coluna)
+            celula.value = valor
+        except Exception:
+            if coordenada.upper().startswith('B'):
+                ws.cell(row=25, column=2, value=valor)
+            else:
+                raise
+
+
 def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
     """Retorna o cliente dominante na janela de 3 ciclos após a inspeção, ignorando o primeiro ciclo que segue a inspeção."""
     if dados_hist_uc is None or dados_hist_uc.empty or pd.isnull(data_inspecao_usada):
@@ -229,7 +246,7 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     dt_hoje = datetime.now()
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
     # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL
-    ws['B25'] = valor_para_float_seguro(tarifa_vigente, 0.0)
+    set_cell_value_seguro(ws, 'B25', valor_para_float_seguro(tarifa_vigente, 0.0))
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -279,7 +296,7 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     dt_hoje = datetime.now()
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
     # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL PARA O PDF
-    ws['B25'] = valor_para_float_seguro(tarifa_vigente, 0.0)
+    set_cell_value_seguro(ws, 'B25', valor_para_float_seguro(tarifa_vigente, 0.0))
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
