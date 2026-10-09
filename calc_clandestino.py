@@ -113,6 +113,25 @@ def set_cell_value_seguro(ws, coordenada, valor):
                 raise
 
 
+def aplicar_layout_a4(ws):
+    """Ajusta a planilha para o layout A4 e margens mais adequadas ao PDF gerado."""
+    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.page_setup.fitToPage = True
+    ws.page_margins.left = 0.25
+    ws.page_margins.right = 0.25
+    ws.page_margins.top = 0.4
+    ws.page_margins.bottom = 0.4
+    ws.page_margins.header = 0.1
+    ws.page_margins.footer = 0.1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.sheet_view.zoomScale = 100
+    ws.print_options.horizontalCentered = False
+    ws.print_options.verticalCentered = False
+
+
 def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
     """Retorna o cliente dominante na janela de 3 ciclos após a inspeção, ignorando o primeiro ciclo que segue a inspeção."""
     if dados_hist_uc is None or dados_hist_uc.empty or pd.isnull(data_inspecao_usada):
@@ -226,12 +245,7 @@ def converter_para_pdf_universal(caminho_entrada, caminho_saida):
 def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_diario, dias_cobranca, usou_minima, dt_ini_efetiva, dt_fim_efetiva, tarifa_vigente):
     wb = openpyxl.load_workbook(caminho_modelo)
     ws = wb['DIARIO'] if 'DIARIO' in wb.sheetnames else wb.active
-    
-    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 1
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    aplicar_layout_a4(ws)
     
     ws['A6'] = f"Goiânia, {obter_data_extenso_pt()}"
     ws['B8'] = str(dados_prod.get('CTA_NOME', 'N/A'))
@@ -252,9 +266,9 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     ws['I22'] = f"=I20-I21"
     
     dt_hoje = datetime.now()
+    tarifa_valor = valor_para_float_seguro(tarifa_vigente, 0.0)
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
-    # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL
-    set_cell_value_seguro(ws, 'B25', valor_para_float_seguro(tarifa_vigente, 0.0))
+    set_cell_value_seguro(ws, 'B25', round(tarifa_valor, 6))
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -276,12 +290,7 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     
     wb = openpyxl.load_workbook(caminho_modelo)
     ws = wb['DIARIO'] if 'DIARIO' in wb.sheetnames else wb.active
-    
-    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 1
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    aplicar_layout_a4(ws)
     
     ws['A6'] = f"Goiânia, {obter_data_extenso_pt()}"
     ws['B8'] = str(dados_prod.get('CTA_NOME', 'N/A'))
@@ -302,9 +311,9 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     ws['I22'] = f"=I20-I21"
     
     dt_hoje = datetime.now()
+    tarifa_valor = valor_para_float_seguro(tarifa_vigente, 0.0)
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
-    # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL PARA O PDF
-    set_cell_value_seguro(ws, 'B25', valor_para_float_seguro(tarifa_vigente, 0.0))
+    set_cell_value_seguro(ws, 'B25', round(tarifa_valor, 6))
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
