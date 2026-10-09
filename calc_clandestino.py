@@ -69,7 +69,17 @@ def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
     if dados_hist_uc is None or dados_hist_uc.empty or pd.isnull(data_inspecao_usada):
         return "N/A", pd.DataFrame(), None
 
-    pos_faturamento = dados_hist_uc[dados_hist_uc['DATA_FINAL'] > data_inspecao_usada].copy()
+    dados_hist_uc = dados_hist_uc.copy()
+    if 'DATA_FINAL' not in dados_hist_uc.columns:
+        return "N/A", pd.DataFrame(), None
+
+    dados_hist_uc['DATA_FINAL_PARSED'] = pd.to_datetime(
+        dados_hist_uc['DATA_FINAL'],
+        format='%d/%m/%Y',
+        errors='coerce'
+    )
+
+    pos_faturamento = dados_hist_uc[dados_hist_uc['DATA_FINAL_PARSED'] > pd.Timestamp(data_inspecao_usada)].copy()
     if len(pos_faturamento) <= 1:
         return "N/A", pd.DataFrame(), None
 
