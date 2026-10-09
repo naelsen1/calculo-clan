@@ -64,6 +64,30 @@ def fmt_br(valor, decimais=2):
     return formato.format(valor).replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def valor_para_float_seguro(valor, padrao=0.0):
+    """Converte valores de tarifa/consumo para float, mesmo quando vierem em formato de string ou nulo."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return float(padrao)
+
+    try:
+        if isinstance(valor, str):
+            texto = valor.strip()
+            if texto in ('', 'N/A', 'nan', 'NaN', 'None'):
+                return float(padrao)
+            texto = texto.replace('R$', '').replace('$', '').replace('.', '').replace(',', '.')
+            return float(texto)
+        return float(valor)
+    except Exception:
+        try:
+            texto = str(valor).strip()
+            if texto in ('', 'N/A', 'nan', 'NaN', 'None'):
+                return float(padrao)
+            texto = texto.replace('R$', '').replace('$', '').replace('.', '').replace(',', '.')
+            return float(texto)
+        except Exception:
+            return float(padrao)
+
+
 def obter_cliente_da_janela(dados_hist_uc, data_inspecao_usada):
     """Retorna o cliente dominante na janela de 3 ciclos após a inspeção, ignorando o primeiro ciclo que segue a inspeção."""
     if dados_hist_uc is None or dados_hist_uc.empty or pd.isnull(data_inspecao_usada):
@@ -197,7 +221,7 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     ws['H15'] = dias_cobranca
     
     ws['A19'] = "Consumo Base Dia (kWh/dia)"
-    ws['I19'] = round(consumo_diario, 4)
+    ws['I19'] = round(float(valor_para_float_seguro(consumo_diario, 0.0)), 4)
     ws['I20'] = f"=I19*H15"
     ws['I21'] = 0
     ws['I22'] = f"=I20-I21"
@@ -205,7 +229,7 @@ def preencher_modelo_excel(caminho_modelo, dados_prod, maior_ciclo_row, consumo_
     dt_hoje = datetime.now()
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
     # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL
-    ws['B25'] = float(tarifa_vigente)
+    ws['B25'] = valor_para_float_seguro(tarifa_vigente, 0.0)
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -247,7 +271,7 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     ws['H15'] = dias_cobranca
     
     ws['A19'] = "Consumo Base Dia (kWh/dia)"
-    ws['I19'] = round(consumo_diario, 4)
+    ws['I19'] = round(float(valor_para_float_seguro(consumo_diario, 0.0)), 4)
     ws['I20'] = f"=I19*H15"
     ws['I21'] = 0
     ws['I22'] = f"=I20-I21"
@@ -255,7 +279,7 @@ def gerar_e_converter_pdf_demanda(caminho_modelo, dados_prod, maior_ciclo_row, c
     dt_hoje = datetime.now()
     ws['A25'] = f"d) Tarifa atual ref.: {dt_hoje.strftime('%m/%Y')}"
     # 📌 TARIFA DINÂMICA DECLARADA NA SIDEBAR APLICADA NO EXCEL PARA O PDF
-    ws['B25'] = float(tarifa_vigente)
+    ws['B25'] = valor_para_float_seguro(tarifa_vigente, 0.0)
     
     criterio_str = "MÍNIMA" if usou_minima else "LIDA"
     mes_ref = int(maior_ciclo_row['MES_REF'].values[0])
@@ -337,9 +361,9 @@ st.sidebar.markdown("---")
 st.sidebar.header("Configuração de Tarifa")
 tarifa_vigente_input = st.sidebar.number_input(
     "Tarifa Vigente (R$/kWh):",
-    value=1.17466,
-    format="%.5f",
-    step=0.00001,
+    value=1.146179,
+    format="%.6f",
+    step=0.000001,
     help="Tarifa aplicável para a apuração do valor total faturado."
 )
 
