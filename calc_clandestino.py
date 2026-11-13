@@ -29,6 +29,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# CONTROLE DOS BALÕES NA BARRA LATERAL
+st.sidebar.header("Preferências")
+ativar_baloes = st.sidebar.toggle("🎈 Ativar balões (Sexta-feira)", value=True)
+st.sidebar.markdown("---")
+
 # -----------------------------------------------------------------------------
 # 🎈 EASTER EGG DA SEXTA-FEIRA (OPÇÃO 1 + OPÇÃO 4)
 # -----------------------------------------------------------------------------
@@ -39,7 +44,8 @@ minuto = agora.minute
 
 # Condição: Sexta-feira (4) a partir das 08:30 da manhã
 if dia_semana == 4 and (hora > 8 or (hora == 8 and minuto >= 30)):
-    st.balloons()  # Dispara os balões na tela
+    if ativar_baloes:
+        st.balloons()  # Dispara os balões apenas se o toggle estiver ativo
     st.warning("🚨 **REGRA DE OURO DA SEXTA:** Sexta-Feira, 08:30 da manhã: **Quem fez, fez!** Quem não fez, só na SEGUNDA! ☕🎉")
 # -----------------------------------------------------------------------------
 
