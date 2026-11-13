@@ -377,7 +377,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("Configuração de Tarifa")
 tarifa_vigente_input = st.sidebar.number_input(
     "Tarifa Vigente (R$/kWh):",
-    value=1.146179,
+    value=1.222451,
     format="%.6f",
     step=0.000001,
     help="Tarifa aplicável para a apuração do valor total faturado."
